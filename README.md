@@ -4,7 +4,7 @@ Easy to use **Go** **Li**nk **Sh**ortener.
 
 # Run
 1. Download latest release
-2. Create `config.ini` file ([Configuration](#Configuration))
+2. Create `config.ini` file ([Configuration](#configuration))
 3. Run `golish-**** -config config.ini`
 
 # Configuration
