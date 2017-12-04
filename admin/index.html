@@ -1,142 +1,164 @@
 <html>
 <head>
-	<title>Golish</title>
-	<link rel="stylesheet" type="text/css" href="css/datatables.min.css"/>
-	<link rel="stylesheet" type="text/css" href="css/foundation.min.css"/>
-	<link rel="stylesheet" type="text/css" href="css/dataTables.foundation.min.css"/>
-	<script type="text/javascript" src="js/jquery-3.2.1.min.js"></script>
-	<script type="text/javascript" src="js/jquery.dataTables.min.js"></script>
-	<script type="text/javascript" src="js/foundation.min.js"></script>
-	<script type="text/javascript" src="js/dataTables.foundation.min.js"></script>
-	<style>
-		#container{
-			width: 1000px;
-			margin: 10 auto;
-		}
-		input[type="submit"]{
-			margin-top: 24px;
-			width: 100%;
-		}
-		abbr[title]{
-			cursor: pointer;
-		}
-	</style>
+    <title>Golish</title>
+    <link rel="stylesheet" type="text/css" href="css/datatables.min.css"/>
+    <link rel="stylesheet" type="text/css" href="css/foundation.min.css"/>
+    <link rel="stylesheet" type="text/css" href="css/dataTables.foundation.min.css"/>
+    <script type="text/javascript" src="js/jquery-3.2.1.min.js"></script>
+    <script type="text/javascript" src="js/jquery.dataTables.min.js"></script>
+    <script type="text/javascript" src="js/foundation.min.js"></script>
+    <script type="text/javascript" src="js/dataTables.foundation.min.js"></script>
+    <style>
+        #container {
+            width: 1000px;
+            margin: 10px auto;
+        }
+
+        input[type="submit"] {
+            margin-top: 24px;
+            width: 100%;
+        }
+
+        abbr[title] {
+            cursor: pointer;
+        }
+
+        .url-container {
+            word-break: break-word;
+            width: 435px;
+        }
+    </style>
 </head>
 <body>
-	<div id="container">
-		<h1>Golish - URL Shortener</h1>
-		<form onsubmit="addLink(this);return false;" autocomplete="off">
-			<div class="grid-container">
-				<div class="grid-x grid-padding-x">
-					<div class="medium-2 cell">
-						<label>Optional
-							<input type="text" name="slug" placeholder="Short link">
-						</label>
-					</div>
-					<div class="medium-8 cell">
-						<label>Required
-							<input type="text" name="url" placeholder="Full link" required>
-						</label>
-					</div>
-					<div class="medium-2 cell">
-						<input type="submit" class="button" value="Add link">
-					</div>
-				</div>
-			</div>
-		</form>
-		<table id="links" cellspacing="0">
-			<thead>
-				<tr>
-					<th>Slug</th>
-					<th>Url</th>
-					<th>Clicks</th>
-					<th>Created</th>
-					<th>Actions</th>
-				</tr>
-			</thead>
-		</table>
-	</div>
-	<script>
-		$(document).ready(function(){
-			var table = $('#links').DataTable({
-				'ajax': {
-					url: 'list',
-					dataSrc: function(json){
-						for ( var i=0, ien=json.length ; i<ien ; i++ ) {
-							json[i]['actions'] = '<a onclick="delLink(this, \''+json[i]['slug']+'\')">Delete</a><a style="padding-left:20px" onclick="editLink(this, \''+json[i]['slug']+'\')">Edit</a>';
-							json[i]['slug'] = '<abbr title="Click to copy">'+json[i]['slug']+'</abbr>';
-							json[i]['url'] = '<a href="'+json[i]['url']+'" target="_blank">'+json[i]['url']+'</a>';
-							var date = new Date(json[i]['created']);
-							json[i]['created'] = date.getUTCFullYear()+'.'+('0' + (date.getUTCMonth()+1)).slice(-2)+'.'+('0' + date.getUTCDate()).slice(-2)+', '+date.toLocaleTimeString();
-						}
-						return json;
-					}
-				},
-				'columns': [
-					{data: 'slug', width: 90},
-					{data: 'url'},
-					{data: 'clicks', type: 'numeric', searchable: false, width: 70},
-					{data: 'created', searchable: false, type: 'date', width: 160},
-					{data: 'actions', orderable: false, searchable: false, width: 100}
-				],
-				'order': [[3, 'desc']]
-			});
-			$(document).on('click', 'abbr', function (event) {
-				var domain = location.protocol+'//'+location.hostname+(location.port ? ':'+location.port: '');
-				var link = domain + '/' + $(event.target).text()
-				
-				var $temp = $('<input>');
-				$("body").append($temp);
-				$temp.val(link).select();
-				document.execCommand('copy');
-				$temp.remove();
-			});
-			document.editLink = function(el, slug){
-				var url = prompt('Enter new url for "' + slug + '"');
-				if (url == undefined || url.length == 0)
-					return;
-				$.ajax({
-					url: 'edit',
-					type: 'POST',
-					data: {
-						slug: slug,
-						url: url
-					},
-					success: function(data){
-						table.ajax.reload();
-					}
-				});
-			};
-			document.delLink = function(el, slug){
-				if (!confirm('Are you sure? Deleting "' + slug + '"'))
-					return;
-				$.ajax({
-					url: 'delete',
-					type: 'POST',
-					data: {
-						slug: slug
-					},
-					success: function(data){
-						table.row($(el).closest('tr')).remove().draw(false);
-					}
-				});
-			};
-			document.addLink = function(form){
-				$.ajax({
-					url: 'create',
-					type: 'POST',
-					data: {
-						slug: $(form).find('input[name="slug"]').val(),
-						url: $(form).find('input[name="url"]').val()
-					},
-					success: function(){
-						$(form).find('input[name="slug"]').val('');
-						$(form).find('input[name="url"]').val('');
-						table.ajax.reload();
-					}
-				});
-			};
-		});
-	</script>
+<div id="container">
+    <h1>Golish - URL Shortener</h1>
+    <form onsubmit="addLink(this);return false;" autocomplete="off">
+        <div class="grid-container">
+            <div class="grid-x grid-padding-x">
+                <div class="medium-2 cell">
+                    <label>Optional
+                        <input type="text" name="slug" placeholder="Short link">
+                    </label>
+                </div>
+                <div class="medium-8 cell">
+                    <label>Required
+                        <input type="text" name="url" placeholder="Full link" required>
+                    </label>
+                </div>
+                <div class="medium-2 cell">
+                    <input type="submit" class="button" value="Add link">
+                </div>
+            </div>
+        </div>
+    </form>
+    <table id="links" cellspacing="0">
+        <thead>
+        <tr>
+            <th>Slug</th>
+            <th>Url</th>
+            <th>Clicks</th>
+            <th>Created</th>
+            <th>Actions</th>
+        </tr>
+        </thead>
+    </table>
+</div>
+<script>
+    $(document).ready(function () {
+        var table = $('#links').DataTable({
+            'ajax': {
+                url: 'list',
+                dataSrc: function (json) {
+                    for (var i = 0, ien = json.length; i < ien; i++) {
+                        json[i]['actions'] = '<a onclick="delLink(this, \'' + json[i]['slug'] + '\')">Delete</a><a style="padding-left:20px" onclick="editLink(this, \'' + json[i]['slug'] + '\')">Edit</a>';
+                    }
+                    return json;
+                }
+            },
+            'columns': [
+                {data: 'slug', width: 90},
+                {data: 'url'},
+                {data: 'clicks', type: 'numeric', searchable: false, width: 70},
+                {data: 'created', searchable: false, type: 'date', width: 160},
+                {data: 'actions', orderable: false, searchable: false, width: 100}
+            ],
+            columnDefs: [
+                {
+                    render: function (data, type, full, meta) {
+                        return '<abbr title="Click to copy">' + data + '</abbr>';
+                    },
+                    targets: 0
+                }, {
+                    render: function (data, type, full, meta) {
+                        return '<div class="url-container"><a href="' + data + '" target="_blank">' + decodeURIComponent(data) + '</a></div>';
+                    },
+                    targets: 1
+                }, {
+                    render: function (data, type, full, meta) {
+                        var date = new Date(data);
+                        return date.getUTCFullYear() + '.' + ('0' + (date.getUTCMonth() + 1)).slice(-2) + '.' + ('0' + date.getUTCDate()).slice(-2) + ', ' + date.toLocaleTimeString();
+                    },
+                    targets: 3
+                }
+            ],
+            'order': [[3, 'desc']]
+        });
+        $(document).on('click', 'abbr', function (event) {
+            var domain = location.protocol + '//' + location.hostname + (location.port ? ':' + location.port : '');
+            var link = domain + '/' + $(event.target).text();
+
+            var $temp = $('<input>');
+            $("body").append($temp);
+            $temp.val(link).select();
+            document.execCommand('copy');
+            $temp.remove();
+        });
+        document.editLink = function (el, slug) {
+            var url = prompt('Enter new url for "' + slug + '"');
+            if (url == null || url.length === 0)
+                return;
+            $.ajax({
+                url: 'edit',
+                type: 'POST',
+                data: {
+                    slug: slug,
+                    url: url
+                },
+                success: function (data) {
+                    table.ajax.reload();
+                }
+            });
+        };
+        document.delLink = function (el, slug) {
+            if (!confirm('Are you sure? Deleting "' + slug + '"'))
+                return;
+            $.ajax({
+                url: 'delete',
+                type: 'POST',
+                data: {
+                    slug: slug
+                },
+                success: function (data) {
+                    table.row($(el).closest('tr')).remove().draw(false);
+                }
+            });
+        };
+        document.addLink = function (form) {
+            $.ajax({
+                url: 'create',
+                type: 'POST',
+                data: {
+                    slug: $(form).find('input[name="slug"]').val(),
+                    url: $(form).find('input[name="url"]').val()
+                },
+                success: function () {
+                    $(form).find('input[name="slug"]').val('');
+                    $(form).find('input[name="url"]').val('');
+                    table.ajax.reload();
+                }
+            });
+        };
+    });
+</script>
 </body>
 </html>
