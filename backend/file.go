@@ -31,15 +31,11 @@ func NewFile(slugLength int, path string) (*File, error) {
 	}
 
 	if _, err := os.Stat(backend.file); os.IsNotExist(err) {
-		file, err := os.Create(backend.file)
-		if err != nil {
-			return nil, err
-		}
-		file.Close()
+		backend.dirty = true
+		backend.cache = &sync.Map{}
 		if err = backend.save(); err != nil {
 			return nil, err
 		}
-		backend.cache = &sync.Map{}
 	} else {
 		if err = backend.load(); err != nil {
 			return nil, err
