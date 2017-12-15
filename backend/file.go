@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
+	"log"
 	"os"
 	pathpkg "path"
 	"sync"
 	"time"
-	"log"
 )
 
 type File struct {
