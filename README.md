@@ -1,5 +1,7 @@
 # Golish
-Easy to use **Go** **Li**nk **Sh**ortener.
+Easy to use **Go** **Li**nk **Sh**ortener. Golish is not intended for tens of millions of shortened links
+ because it tries to cache all links to improve performance.
+
 ![Golish screenshot](https://i.imgur.com/DAWpaxy.png "Golish screenshot")
 
 # Run
