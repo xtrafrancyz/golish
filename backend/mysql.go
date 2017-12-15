@@ -1,4 +1,4 @@
-package main
+package backend
 
 import (
 	"database/sql"
@@ -7,14 +7,16 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	"sync"
 )
 
-type MysqlStore struct {
-	cache map[string]*Link
-	db    *sql.DB
+type Mysql struct {
+	cache      *sync.Map
+	db         *sql.DB
+	slugLength int
 }
 
-func newMysqlStore(host, user, password, database string) (*MysqlStore, error) {
+func NewMysql(slugLength int, host, user, password, database string) (*Mysql, error) {
 	db, err := sql.Open("mysql", user+":"+password+"@tcp("+host+")/"+database+"?parseTime=true")
 	if err != nil {
 		return nil, err
@@ -35,24 +37,25 @@ func newMysqlStore(host, user, password, database string) (*MysqlStore, error) {
 		return nil, err
 	}
 
-	store := &MysqlStore{
-		db:    db,
-		cache: make(map[string]*Link),
+	backend := &Mysql{
+		cache:      &sync.Map{},
+		db:         db,
+		slugLength: slugLength,
 	}
-	return store, nil
+	return backend, nil
 }
 
-func (s *MysqlStore) getLink(slug string) *Link {
-	link, ok := s.cache[slug]
+func (s *Mysql) GetLink(slug string) *Link {
+	link0, ok := s.cache.Load(slug)
 	if ok {
-		return link
+		return link0.(*Link)
 	}
-	link = &Link{Slug: slug}
+	link := &Link{Slug: slug}
 	err := s.db.QueryRow("SELECT url, clicks, created FROM links WHERE slug = ?", slug).Scan(&link.Url, &link.Clicks, &link.Created)
 	if err != nil && err != sql.ErrNoRows {
 		log.Println("mysql error: ", err)
 	}
-	s.cache[slug] = link
+	s.cache.Store(slug, link)
 	if link.Url != "" {
 		return link
 	} else {
@@ -60,8 +63,8 @@ func (s *MysqlStore) getLink(slug string) *Link {
 	}
 }
 
-func (s *MysqlStore) tryClickLink(slug string) *Link {
-	link := s.getLink(slug)
+func (s *Mysql) TryClickLink(slug string) *Link {
+	link := s.GetLink(slug)
 	if link == nil {
 		return nil
 	}
@@ -70,7 +73,7 @@ func (s *MysqlStore) tryClickLink(slug string) *Link {
 	return link
 }
 
-func (s *MysqlStore) getAllLinks() []*Link {
+func (s *Mysql) GetAllLinks() []*Link {
 	rows, err := s.db.Query("SELECT slug, url, clicks, created FROM links")
 	list := make([]*Link, 0)
 	if err != nil {
@@ -78,22 +81,22 @@ func (s *MysqlStore) getAllLinks() []*Link {
 		return list
 	}
 	for rows.Next() {
-		link := Link{}
+		link := &Link{}
 		rows.Scan(&link.Slug, &link.Url, &link.Clicks, &link.Created)
-		s.cache[link.Slug] = &link
-		list = append(list, &link)
+		s.cache.Store(link.Slug, link)
+		list = append(list, link)
 	}
 	return list
 }
 
-func (s *MysqlStore) create(url string) (*Link, error) {
+func (s *Mysql) Create(url string) (*Link, error) {
 	var slug string
 	err := s.db.QueryRow("SELECT slug FROM links WHERE url = ?", url).Scan(&slug)
 	if err == nil {
-		return s.getLink(slug), nil
+		return s.GetLink(slug), nil
 	}
 	for {
-		slug = generateSlug()
+		slug = generateSlug(s.slugLength)
 		rows, err := s.db.Query("SELECT 1 FROM links WHERE slug = ?", slug)
 		if err != nil {
 			log.Println("mysql error: ", err)
@@ -104,44 +107,39 @@ func (s *MysqlStore) create(url string) (*Link, error) {
 			break
 		}
 	}
-	return s.createCustom(slug, url)
+	return s.CreateCustom(slug, url)
 }
 
-func (s *MysqlStore) createCustom(slug, url string) (*Link, error) {
-	link := s.getLink(slug)
+func (s *Mysql) CreateCustom(slug, url string) (*Link, error) {
+	link := s.GetLink(slug)
 	if link != nil {
 		return nil, errors.New("slug '" + slug + "' is already exists")
 	} else {
-		return s.createNow(slug, url)
+		_, err := s.db.Exec("INSERT INTO links (slug, url, created) VALUES (?, ?, ?)", slug, url, time.Now())
+		if err != nil {
+			log.Println("mysql error: ", err)
+			return nil, errors.New("database error")
+		}
+		link := &Link{
+			Slug:    slug,
+			Url:     url,
+			Created: time.Now(),
+		}
+		s.cache.Store(slug, link)
+		return link, nil
 	}
 }
 
-func (s *MysqlStore) createNow(slug, url string) (*Link, error) {
-	_, err := s.db.Exec("INSERT INTO links (slug, url, created) VALUES (?, ?, ?)", slug, url, time.Now())
-	if err != nil {
-		log.Println("mysql error: ", err)
-		return nil, errors.New("database error")
-	}
-	link := &Link{
-		Slug:    slug,
-		Url:     url,
-		Created: time.Now(),
-	}
-	s.cache[slug] = link
-	return link, nil
-}
-
-func (s *MysqlStore) delete(slug string) {
-	delete(s.cache, slug)
+func (s *Mysql) Delete(slug string) {
+	s.cache.Delete(slug)
 	_, err := s.db.Exec("DELETE FROM links WHERE slug = ?", slug)
 	if err != nil {
 		log.Println("mysql error: ", err)
 	}
 }
 
-func (s *MysqlStore) edit(slug, url string) {
-	log.Print(slug, url)
-	delete(s.cache, slug)
+func (s *Mysql) Edit(slug, url string) {
+	s.cache.Delete(slug)
 	_, err := s.db.Exec("UPDATE links SET url = ? WHERE slug = ?", url, slug)
 	if err != nil {
 		log.Println("mysql error: ", err)

@@ -13,16 +13,19 @@ Easy to use **Go** **Li**nk **Sh**ortener.
 - `slug-length` -- Length of the generated short url (default: 5).
 - `admin-path` -- Secret path with admin interface (default: admin (`example.com/@admin/`)).
 - `default-redirect` -- Address to redirect from root page (root page - `example.com/`).
+- `backend` -- Backend type **mysql** or **file** (default: file).
 - `mysql-host` -- Mysql server address (default: 127.0.0.1:3306).
 - `mysql-user` -- Mysql user (default: golish).
 - `mysql-password` -- Mysql password (default: golish).
 - `mysql-database` -- Mysql database name (default: golish).
+- `file-path` -- Database file path for **file** backend (default: db.json).
 
 ### Example of `config.ini` file
 ```ini
 port = 80
 admin-path = RANDOM_STRING
 default-redirect = https://google.com
+backend = mysql
 mysql-user = user99
 mysql-password = qwerty
 ```

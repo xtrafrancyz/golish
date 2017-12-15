@@ -13,6 +13,7 @@ import (
 	"github.com/qiangxue/fasthttp-routing"
 	"github.com/valyala/fasthttp"
 	"github.com/vharitonsky/iniflags"
+	bk "github.com/xtrafrancyz/golish/backend"
 )
 
 var Config struct {
@@ -22,13 +23,19 @@ var Config struct {
 	adminPath       string
 	defaultRedirect string
 
+	backend string
+
+	// mysql backend
 	mysqlHost     string
 	mysqlDatabase string
 	mysqlUser     string
 	mysqlPassword string
+
+	// file backend
+	filePath string
 }
 
-var store Store
+var backend bk.Backend
 var adminFiles *rice.Box
 
 func main() {
@@ -39,17 +46,26 @@ func main() {
 	flag.IntVar(&Config.slugLength, "slug-length", 5, "Length of generated url")
 	flag.StringVar(&Config.adminPath, "admin-path", "admin", "Admin path")
 	flag.StringVar(&Config.defaultRedirect, "default-redirect", "", "Default redirect path")
+	flag.StringVar(&Config.backend, "backend", "file", "Backend name (mysql or file)")
 	flag.StringVar(&Config.mysqlHost, "mysql-host", "127.0.0.1:3306", "MySQL host")
 	flag.StringVar(&Config.mysqlDatabase, "mysql-database", "golish", "MySQL database")
 	flag.StringVar(&Config.mysqlUser, "mysql-user", "golish", "MySQL user")
 	flag.StringVar(&Config.mysqlPassword, "mysql-password", "golish", "MySQL user")
+	flag.StringVar(&Config.filePath, "file-path", "db.json", "Database file (for file backend)")
 
 	iniflags.Parse()
 
 	var err error
-	store, err = newMysqlStore(Config.mysqlHost, Config.mysqlUser, Config.mysqlPassword, Config.mysqlDatabase)
+	if Config.backend == "mysql" {
+		backend, err = bk.NewMysql(Config.slugLength, Config.mysqlHost, Config.mysqlUser, Config.mysqlPassword, Config.mysqlDatabase)
+	} else if Config.backend == "file" {
+		backend, err = bk.NewFile(Config.slugLength, Config.filePath)
+	} else {
+		log.Fatalf("backend must be 'mysql' or 'file'")
+		return
+	}
 	if err != nil {
-		log.Fatalf("mysql connection: %s", err)
+		log.Fatalf("backend creation: %s", err)
 		return
 	}
 
@@ -95,7 +111,7 @@ func handleRoot(c *routing.Context) error {
 
 func handleSlug(c *routing.Context) error {
 	log.Print(string(c.URI().Path()))
-	full := store.tryClickLink(c.Param("slug"))
+	full := backend.TryClickLink(c.Param("slug"))
 
 	if full != nil {
 		c.Redirect(full.Url, fasthttp.StatusFound)
@@ -111,6 +127,7 @@ func handleAdminRoot(c *routing.Context) error {
 	if path == "/" {
 		path = "/index.html"
 	}
+	log.Print("{admin}" + path)
 	bytes, err := adminFiles.Bytes(path)
 	if err != nil {
 		c.NotFound()
@@ -131,7 +148,8 @@ func handleAdminRoot(c *routing.Context) error {
 }
 
 func handleList(c *routing.Context) error {
-	links := store.getAllLinks()
+	log.Print("{admin}/list")
+	links := backend.GetAllLinks()
 	marshaled, _ := json.Marshal(links)
 	c.Response.Header.Set("Content-Type", "application/json")
 	c.Write(marshaled)
@@ -140,16 +158,17 @@ func handleList(c *routing.Context) error {
 
 func handleCreate(c *routing.Context) error {
 	url := c.PostArgs().Peek("url")
+	log.Printf("{admin}/create (url=%s)", url)
 	if len(url) == 0 {
 		c.SetStatusCode(fasthttp.StatusBadRequest)
 	} else {
-		var link *Link
+		var link *bk.Link
 		var err error
 		slug := c.PostArgs().Peek("slug")
 		if len(slug) == 0 {
-			link, err = store.create(string(url))
+			link, err = backend.Create(string(url))
 		} else {
-			link, err = store.createCustom(string(slug), string(url))
+			link, err = backend.CreateCustom(string(slug), string(url))
 		}
 		var marshaled []byte
 		if err != nil {
@@ -168,7 +187,8 @@ func handleCreate(c *routing.Context) error {
 
 func handleDelete(c *routing.Context) error {
 	slug := c.PostArgs().Peek("slug")
-	store.delete(string(slug))
+	log.Printf("{admin}/delete (slug=%s)", slug)
+	backend.Delete(string(slug))
 	c.SetStatusCode(fasthttp.StatusOK)
 	return nil
 }
@@ -176,7 +196,8 @@ func handleDelete(c *routing.Context) error {
 func handleEdit(c *routing.Context) error {
 	slug := c.PostArgs().Peek("slug")
 	url := c.PostArgs().Peek("url")
-	store.edit(string(slug), string(url))
+	log.Printf("{admin}/edit (slug=%s, url=%s)", slug, url)
+	backend.Edit(string(slug), string(url))
 	c.SetStatusCode(fasthttp.StatusOK)
 	return nil
 }
