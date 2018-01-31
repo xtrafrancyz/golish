@@ -114,7 +114,8 @@
             $temp.remove();
         });
         document.editLink = function (el, slug) {
-            var url = prompt('Enter new url for "' + slug + '"');
+            var url = $(el).closest('tr').find(".url-container a").text();
+            url = prompt('Enter new url for "' + slug + '"', url);
             if (url == null || url.length === 0)
                 return;
             $.ajax({
