@@ -28,6 +28,8 @@ var Config struct {
 
 	// file backend
 	filePath string
+
+	slugCharacters string
 }
 
 func main() {
@@ -44,6 +46,7 @@ func main() {
 	flag.StringVar(&Config.mysqlUser, "mysql-user", "golish", "MySQL user")
 	flag.StringVar(&Config.mysqlPassword, "mysql-password", "golish", "MySQL user")
 	flag.StringVar(&Config.filePath, "file-path", "db.json", "Database file (for file backend)")
+	Config.slugCharacters = "a-zA-Z0-9_-"
 
 	iniflags.Parse()
 

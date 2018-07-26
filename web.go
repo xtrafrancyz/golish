@@ -10,6 +10,8 @@ import (
 	"github.com/qiangxue/fasthttp-routing"
 	"github.com/valyala/fasthttp"
 	"github.com/xtrafrancyz/golish/backend"
+	"regexp"
+	"errors"
 )
 
 type web struct {
@@ -20,7 +22,7 @@ type web struct {
 func (w *web) run() {
 	router := routing.New()
 	router.Get("/", w.handleRoot)
-	router.Get("/<slug:[a-zA-Z0-9]+>", w.handleSlug)
+	router.Get("/<slug:["+Config.slugCharacters+"]+>", w.handleSlug)
 	adminGroup := router.Group("/@"+Config.adminPath, w.addACAO)
 	adminGroup.Get("/list", w.handleList)
 	adminGroup.Post("/create", w.handleCreate)
@@ -104,17 +106,21 @@ func (w *web) handleList(c *routing.Context) error {
 
 func (w *web) handleCreate(c *routing.Context) error {
 	url := c.PostArgs().Peek("url")
-	log.Printf("{admin}/create (url=%s)", url)
+	slug := c.PostArgs().Peek("slug")
+	log.Printf("{admin}/create (url=%s, slug=%s)", url, slug)
 	if len(url) == 0 {
 		c.SetStatusCode(fasthttp.StatusBadRequest)
 	} else {
 		var link *backend.Link = nil
 		var err error = nil
-		slug := c.PostArgs().Peek("slug")
 		if len(slug) == 0 {
 			link, err = w.backend.Create(string(url))
 		} else {
-			link, err = w.backend.CreateCustom(string(slug), string(url))
+			if ok, _ := regexp.Match("^["+Config.slugCharacters+"]+$", slug); !ok {
+				err = errors.New("slug contains illegal characters")
+			} else {
+				link, err = w.backend.CreateCustom(string(slug), string(url))
+			}
 		}
 		var marshaled []byte
 		if err != nil {
