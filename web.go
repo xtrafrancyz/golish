@@ -2,16 +2,16 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	"regexp"
 	"strings"
 
 	"github.com/GeertJohan/go.rice"
 	"github.com/qiangxue/fasthttp-routing"
 	"github.com/valyala/fasthttp"
 	"github.com/xtrafrancyz/golish/backend"
-	"regexp"
-	"errors"
 )
 
 type web struct {
