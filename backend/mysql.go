@@ -4,16 +4,25 @@ import (
 	"database/sql"
 	"errors"
 	"log"
+	"sync"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
-	"sync"
 )
 
 type Mysql struct {
 	cache      *sync.Map
 	db         *sql.DB
 	slugLength int
+}
+
+type internalLink struct {
+	*Link
+	lastUsed time.Time
+}
+
+func (l *internalLink) use() {
+	l.lastUsed = time.Now()
 }
 
 func NewMysql(slugLength int, host, user, password, database string) (*Mysql, error) {
@@ -42,25 +51,45 @@ func NewMysql(slugLength int, host, user, password, database string) (*Mysql, er
 		db:         db,
 		slugLength: slugLength,
 	}
+
+	go func() {
+		for range time.Tick(1 * time.Minute) {
+			deadline := time.Now().Add(-10 * time.Minute)
+			backend.cache.Range(func(key, value interface{}) bool {
+				if value.(*internalLink).lastUsed.Before(deadline) {
+					backend.cache.Delete(key)
+				}
+				return true
+			})
+		}
+	}()
+
 	return backend, nil
 }
 
 func (s *Mysql) GetLink(slug string) *Link {
 	link0, ok := s.cache.Load(slug)
 	if ok {
-		return link0.(*Link)
+		link := link0.(*internalLink)
+		link.use()
+		return link.Link
 	}
-	link := &Link{Slug: slug}
+	link := &internalLink{
+		Link: &Link{
+			Slug: slug,
+		},
+	}
+	link.use()
 	err := s.db.QueryRow("SELECT url, clicks, created FROM links WHERE slug = ?", slug).Scan(&link.Url, &link.Clicks, &link.Created)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			log.Println("mysql error: ", err)
 		} else {
-			link = nil
+			link.Link = nil
 		}
 	}
 	s.cache.Store(slug, link)
-	return link
+	return link.Link
 }
 
 func (s *Mysql) TryClickLink(slug string) *Link {
@@ -81,10 +110,13 @@ func (s *Mysql) GetAllLinks() []*Link {
 		return list
 	}
 	for rows.Next() {
-		link := &Link{}
+		link := &internalLink{
+			Link: &Link{},
+		}
+		link.use()
 		rows.Scan(&link.Slug, &link.Url, &link.Clicks, &link.Created)
 		s.cache.Store(link.Slug, link)
-		list = append(list, link)
+		list = append(list, link.Link)
 	}
 	return list
 }
@@ -120,13 +152,16 @@ func (s *Mysql) CreateCustom(slug, url string) (*Link, error) {
 			log.Println("mysql error: ", err)
 			return nil, errors.New("database error")
 		}
-		link := &Link{
-			Slug:    slug,
-			Url:     url,
-			Created: time.Now(),
+		link := &internalLink{
+			Link: &Link{
+				Slug:    slug,
+				Url:     url,
+				Created: time.Now(),
+			},
 		}
+		link.use()
 		s.cache.Store(slug, link)
-		return link, nil
+		return link.Link, nil
 	}
 }
 
