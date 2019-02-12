@@ -22,6 +22,10 @@ type Link struct {
 	Created time.Time `json:"created"`
 }
 
+func (l *Link) String() string {
+	return "Link(" + l.Slug + " => " + l.Url + ")"
+}
+
 func generateSlug(length int) string {
 	// From: http://stackoverflow.com/questions/22892120/how-to-generate-a-random-string-of-a-fixed-length-in-golang
 	var chars = []rune("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")

@@ -52,15 +52,15 @@ func (s *Mysql) GetLink(slug string) *Link {
 	}
 	link := &Link{Slug: slug}
 	err := s.db.QueryRow("SELECT url, clicks, created FROM links WHERE slug = ?", slug).Scan(&link.Url, &link.Clicks, &link.Created)
-	if err != nil && err != sql.ErrNoRows {
-		log.Println("mysql error: ", err)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			log.Println("mysql error: ", err)
+		} else {
+			link = nil
+		}
 	}
 	s.cache.Store(slug, link)
-	if link.Url != "" {
-		return link
-	} else {
-		return nil
-	}
+	return link
 }
 
 func (s *Mysql) TryClickLink(slug string) *Link {
