@@ -90,7 +90,7 @@ func (w *web) handleAdminRoot(c *routing.Context) error {
 			c.Response.Header.Set("Content-Type", "image/png")
 		}
 		c.SetStatusCode(fasthttp.StatusOK)
-		c.Write(bytes)
+		_, _ = c.Write(bytes)
 	}
 	return nil
 }
@@ -100,7 +100,7 @@ func (w *web) handleList(c *routing.Context) error {
 	links := w.backend.GetAllLinks()
 	marshaled, _ := json.Marshal(links)
 	c.Response.Header.Set("Content-Type", "application/json")
-	c.Write(marshaled)
+	_, _ = c.Write(marshaled)
 	return nil
 }
 
@@ -132,7 +132,7 @@ func (w *web) handleCreate(c *routing.Context) error {
 			marshaled, _ = json.Marshal(link)
 		}
 		c.Response.Header.Set("Content-Type", "application/json")
-		c.Write(marshaled)
+		_, _ = c.Write(marshaled)
 	}
 	return nil
 }

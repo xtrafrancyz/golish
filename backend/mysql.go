@@ -19,6 +19,7 @@ type Mysql struct {
 type internalLink struct {
 	*Link
 	lastUsed time.Time
+	dirty    bool
 }
 
 func (l *internalLink) use() {
@@ -56,8 +57,15 @@ func NewMysql(slugLength int, host, user, password, database string) (*Mysql, er
 		for range time.Tick(1 * time.Minute) {
 			deadline := time.Now().Add(-10 * time.Minute)
 			backend.cache.Range(func(key, value interface{}) bool {
-				if value.(*internalLink).lastUsed.Before(deadline) {
+				link := value.(*internalLink)
+				if link.lastUsed.Before(deadline) {
 					backend.cache.Delete(key)
+				} else if link.dirty {
+					_, err := backend.db.Exec("UPDATE links SET clicks = ? WHERE slug = ?", link.Clicks, link.Slug)
+					if err != nil {
+						log.Println("mysql error: ", err)
+					}
+					link.dirty = false
 				}
 				return true
 			})
@@ -67,12 +75,12 @@ func NewMysql(slugLength int, host, user, password, database string) (*Mysql, er
 	return backend, nil
 }
 
-func (s *Mysql) GetLink(slug string) *Link {
+func (s *Mysql) getInternalLink(slug string) *internalLink {
 	link0, ok := s.cache.Load(slug)
 	if ok {
 		link := link0.(*internalLink)
 		link.use()
-		return link.Link
+		return link
 	}
 	link := &internalLink{
 		Link: &Link{
@@ -89,17 +97,21 @@ func (s *Mysql) GetLink(slug string) *Link {
 		}
 	}
 	s.cache.Store(slug, link)
-	return link.Link
+	return link
+}
+
+func (s *Mysql) GetLink(slug string) *Link {
+	return s.getInternalLink(slug).Link
 }
 
 func (s *Mysql) TryClickLink(slug string) *Link {
-	link := s.GetLink(slug)
-	if link == nil {
+	link := s.getInternalLink(slug)
+	if link.Link == nil {
 		return nil
 	}
-	s.db.Exec("UPDATE links SET clicks = clicks + 1 WHERE slug = ?", slug)
-	link.Clicks += 1
-	return link
+	link.Clicks++
+	link.dirty = true
+	return link.Link
 }
 
 func (s *Mysql) GetAllLinks() []*Link {
@@ -114,7 +126,11 @@ func (s *Mysql) GetAllLinks() []*Link {
 			Link: &Link{},
 		}
 		link.use()
-		rows.Scan(&link.Slug, &link.Url, &link.Clicks, &link.Created)
+		err = rows.Scan(&link.Slug, &link.Url, &link.Clicks, &link.Created)
+		if err != nil {
+			log.Println("mysql error: ", err)
+			break
+		}
 		s.cache.Store(link.Slug, link)
 		list = append(list, link.Link)
 	}
