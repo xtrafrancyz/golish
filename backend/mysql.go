@@ -125,13 +125,14 @@ func (s *Mysql) GetAllLinks() []*Link {
 		link := &internalLink{
 			Link: &Link{},
 		}
-		link.use()
 		err = rows.Scan(&link.Slug, &link.Url, &link.Clicks, &link.Created)
 		if err != nil {
 			log.Println("mysql error: ", err)
 			break
 		}
-		s.cache.Store(link.Slug, link)
+		stored, _ := s.cache.LoadOrStore(link.Slug, link)
+		link = stored.(*internalLink)
+		link.use()
 		list = append(list, link.Link)
 	}
 	return list
