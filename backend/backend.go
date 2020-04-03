@@ -18,7 +18,7 @@ type Backend interface {
 type Link struct {
 	Slug    string    `json:"slug"`
 	Url     string    `json:"url"`
-	Clicks  int       `json:"clicks"`
+	Clicks  uint64    `json:"clicks"`
 	Created time.Time `json:"created"`
 }
 

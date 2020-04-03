@@ -39,7 +39,7 @@ func NewMysql(slugLength int, host, user, password, database string) (*Mysql, er
 	_, err = db.Exec("CREATE TABLE IF NOT EXISTS `links` (" +
 		"`slug` varchar(255) COLLATE utf8_unicode_ci NOT NULL," +
 		"`url` text COLLATE utf8_unicode_ci NOT NULL," +
-		"`clicks` int(11) NOT NULL DEFAULT '0'," +
+		"`clicks` bigint(20) NOT NULL DEFAULT '0'," +
 		"`created` datetime DEFAULT NULL," +
 		"PRIMARY KEY (`slug`)" +
 		") ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;")
