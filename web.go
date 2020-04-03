@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/GeertJohan/go.rice"
-	"github.com/qiangxue/fasthttp-routing"
+	"github.com/fasthttp/router"
 	"github.com/valyala/fasthttp"
 	"github.com/xtrafrancyz/golish/backend"
 )
@@ -20,18 +20,18 @@ type web struct {
 }
 
 func (w *web) run() {
-	router := routing.New()
-	router.Get("/", w.handleRoot)
-	router.Get("/<slug:["+Config.slugCharacters+"]+>", w.handleSlug)
-	adminGroup := router.Group("/@"+Config.adminPath, w.addACAO)
-	adminGroup.Get("/list", w.handleList)
-	adminGroup.Post("/create", w.handleCreate)
-	adminGroup.Post("/delete", w.handleDelete)
-	adminGroup.Post("/edit", w.handleEdit)
-	adminGroup.Get("/<file:.*>", w.handleAdminRoot)
+	r := router.New()
+	r.GET("/", w.handleRoot)
+	r.GET("/{slug:["+Config.slugCharacters+"]+}", w.handleSlug)
+	adminGroup := r.Group("/@" + Config.adminPath)
+	adminGroup.GET("/list", w.addACAO(w.handleList))
+	adminGroup.POST("/create", w.addACAO(w.handleCreate))
+	adminGroup.POST("/delete", w.addACAO(w.handleDelete))
+	adminGroup.POST("/edit", w.addACAO(w.handleEdit))
+	adminGroup.GET("/{file:*}", w.addACAO(w.handleAdminRoot))
 
 	server := &fasthttp.Server{
-		Handler:           router.HandleRequest,
+		Handler:           r.Handler,
 		ReduceMemoryUsage: true,
 	}
 
@@ -43,73 +43,70 @@ func (w *web) run() {
 	}
 }
 
-func (w *web) addACAO(c *routing.Context) error {
-	c.Response.Header.Set("Access-Control-Allow-Origin", "*")
-	return nil
-}
-
-func (w *web) handleRoot(c *routing.Context) error {
-	if Config.defaultRedirect != "" {
-		c.Redirect(Config.defaultRedirect, fasthttp.StatusFound)
-	} else {
-		c.NotFound()
+func (w *web) addACAO(h fasthttp.RequestHandler) fasthttp.RequestHandler {
+	return func(ctx *fasthttp.RequestCtx) {
+		ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
+		h(ctx)
 	}
-	return nil
 }
 
-func (w *web) handleSlug(c *routing.Context) error {
-	log.Print(string(c.URI().Path()))
-	full := w.backend.TryClickLink(c.Param("slug"))
+func (w *web) handleRoot(ctx *fasthttp.RequestCtx) {
+	if Config.defaultRedirect != "" {
+		ctx.Redirect(Config.defaultRedirect, fasthttp.StatusFound)
+	} else {
+		ctx.NotFound()
+	}
+}
+
+func (w *web) handleSlug(ctx *fasthttp.RequestCtx) {
+	log.Print(string(ctx.URI().Path()))
+	full := w.backend.TryClickLink(ctx.UserValue("slug").(string))
 
 	if full != nil {
-		c.Redirect(full.Url, fasthttp.StatusFound)
+		ctx.Redirect(full.Url, fasthttp.StatusFound)
 	} else {
-		c.NotFound()
+		ctx.NotFound()
 	}
-
-	return nil
 }
 
-func (w *web) handleAdminRoot(c *routing.Context) error {
-	path := "/" + c.Param("file")
-	if path == "/" {
+func (w *web) handleAdminRoot(ctx *fasthttp.RequestCtx) {
+	path := "/" + ctx.UserValue("file").(string)
+	if path == "//" {
 		path = "/index.html"
 	}
 	log.Print("{admin}" + path)
 	bytes, err := w.adminFiles.Bytes(path)
 	if err != nil {
-		c.NotFound()
+		ctx.NotFound()
 	} else {
 		if strings.HasSuffix(path, ".html") {
-			c.Response.Header.Set("Content-Type", "text/html")
+			ctx.Response.Header.Set("Content-Type", "text/html")
 		} else if strings.HasSuffix(path, ".css") {
-			c.Response.Header.Set("Content-Type", "text/css")
+			ctx.Response.Header.Set("Content-Type", "text/css")
 		} else if strings.HasSuffix(path, ".js") {
-			c.Response.Header.Set("Content-Type", "application/javascript")
+			ctx.Response.Header.Set("Content-Type", "application/javascript")
 		} else if strings.HasSuffix(path, ".png") {
-			c.Response.Header.Set("Content-Type", "image/png")
+			ctx.Response.Header.Set("Content-Type", "image/png")
 		}
-		c.SetStatusCode(fasthttp.StatusOK)
-		_, _ = c.Write(bytes)
+		ctx.SetStatusCode(fasthttp.StatusOK)
+		_, _ = ctx.Write(bytes)
 	}
-	return nil
 }
 
-func (w *web) handleList(c *routing.Context) error {
+func (w *web) handleList(ctx *fasthttp.RequestCtx) {
 	log.Print("{admin}/list")
 	links := w.backend.GetAllLinks()
 	marshaled, _ := json.Marshal(links)
-	c.Response.Header.Set("Content-Type", "application/json")
-	_, _ = c.Write(marshaled)
-	return nil
+	ctx.Response.Header.Set("Content-Type", "application/json")
+	_, _ = ctx.Write(marshaled)
 }
 
-func (w *web) handleCreate(c *routing.Context) error {
-	url := c.PostArgs().Peek("url")
-	slug := c.PostArgs().Peek("slug")
+func (w *web) handleCreate(ctx *fasthttp.RequestCtx) {
+	url := ctx.PostArgs().Peek("url")
+	slug := ctx.PostArgs().Peek("slug")
 	log.Printf("{admin}/create (url=%s, slug=%s)", url, slug)
 	if len(url) == 0 {
-		c.SetStatusCode(fasthttp.StatusBadRequest)
+		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 	} else {
 		var link *backend.Link = nil
 		var err error = nil
@@ -131,27 +128,24 @@ func (w *web) handleCreate(c *routing.Context) error {
 		} else {
 			marshaled, _ = json.Marshal(link)
 		}
-		c.Response.Header.Set("Content-Type", "application/json")
-		_, _ = c.Write(marshaled)
+		ctx.Response.Header.Set("Content-Type", "application/json")
+		_, _ = ctx.Write(marshaled)
 	}
-	return nil
 }
 
-func (w *web) handleDelete(c *routing.Context) error {
-	slug := c.PostArgs().Peek("slug")
+func (w *web) handleDelete(ctx *fasthttp.RequestCtx) {
+	slug := ctx.PostArgs().Peek("slug")
 	log.Printf("{admin}/delete (slug=%s)", slug)
 	w.backend.Delete(string(slug))
-	c.SetStatusCode(fasthttp.StatusOK)
-	return nil
+	ctx.SetStatusCode(fasthttp.StatusOK)
 }
 
-func (w *web) handleEdit(c *routing.Context) error {
-	slug := c.PostArgs().Peek("slug")
-	url := c.PostArgs().Peek("url")
+func (w *web) handleEdit(ctx *fasthttp.RequestCtx) {
+	slug := ctx.PostArgs().Peek("slug")
+	url := ctx.PostArgs().Peek("url")
 	log.Printf("{admin}/edit (slug=%s, url=%s)", slug, url)
 	w.backend.Edit(string(slug), string(url))
-	c.SetStatusCode(fasthttp.StatusOK)
-	return nil
+	ctx.SetStatusCode(fasthttp.StatusOK)
 }
 
 type OperationError struct {
