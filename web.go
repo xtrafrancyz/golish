@@ -60,7 +60,11 @@ func (w *web) handleRoot(ctx *fasthttp.RequestCtx) {
 
 func (w *web) handleSlug(ctx *fasthttp.RequestCtx) {
 	log.Print(string(ctx.URI().Path()))
-	full := w.backend.TryClickLink(ctx.UserValue("slug").(string))
+
+	// Make a copy of a slug. fasthttp/router's UserValues become invalid after the request is completed.
+	slug := copyString(ctx.UserValue("slug").(string))
+
+	full := w.backend.TryClickLink(slug)
 
 	if full != nil {
 		ctx.Redirect(full.Url, fasthttp.StatusFound)
@@ -146,6 +150,13 @@ func (w *web) handleEdit(ctx *fasthttp.RequestCtx) {
 	log.Printf("{admin}/edit (slug=%s, url=%s)", slug, url)
 	w.backend.Edit(string(slug), string(url))
 	ctx.SetStatusCode(fasthttp.StatusOK)
+}
+
+func copyString(in string) string {
+	var b strings.Builder
+	b.Grow(len(in))
+	b.WriteString(in)
+	return b.String()
 }
 
 type OperationError struct {

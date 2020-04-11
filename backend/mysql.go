@@ -116,11 +116,12 @@ func (s *Mysql) TryClickLink(slug string) *Link {
 
 func (s *Mysql) GetAllLinks() []*Link {
 	rows, err := s.db.Query("SELECT slug, url, clicks, created FROM links")
-	list := make([]*Link, 0)
+	list := make([]*Link, 0, 16)
 	if err != nil {
 		log.Println("mysql error: ", err)
 		return list
 	}
+	defer rows.Close()
 	for rows.Next() {
 		link := &internalLink{
 			Link: &Link{},
