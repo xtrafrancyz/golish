@@ -1,34 +1,43 @@
 package main
 
 import (
+	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log"
+	"net/http"
 	"regexp"
 	"strings"
 
-	"github.com/GeertJohan/go.rice"
 	"github.com/fasthttp/router"
 	"github.com/valyala/fasthttp"
+	"github.com/valyala/fasthttp/fasthttpadaptor"
 	"github.com/xtrafrancyz/golish/backend"
 )
 
+//go:embed admin/*
+var adminFiles embed.FS
+
 type web struct {
-	backend    backend.Backend
-	adminFiles *rice.Box
+	backend backend.Backend
 }
 
 func (w *web) run() {
 	r := router.New()
 	r.GET("/", w.handleRoot)
 	r.GET("/{slug:["+Config.slugCharacters+"]+}", w.handleSlug)
+
 	adminGroup := r.Group("/@" + Config.adminPath)
-	adminGroup.GET("/list", w.addACAO(w.handleList))
-	adminGroup.POST("/create", w.addACAO(w.handleCreate))
-	adminGroup.POST("/delete", w.addACAO(w.handleDelete))
-	adminGroup.POST("/edit", w.addACAO(w.handleEdit))
-	adminGroup.GET("/{file:*}", w.addACAO(w.handleAdminRoot))
+	adminGroup.GET("/list", w.handleList)
+	adminGroup.POST("/create", w.handleCreate)
+	adminGroup.POST("/delete", w.handleDelete)
+	adminGroup.POST("/edit", w.handleEdit)
+	files, _ := fs.Sub(adminFiles, "admin")
+	adminGroup.GET("/{file:*}", fasthttpadaptor.NewFastHTTPHandler(
+		http.StripPrefix("/@"+Config.adminPath, http.FileServer(http.FS(files))),
+	))
 
 	server := &fasthttp.Server{
 		Handler:           r.Handler,
@@ -40,13 +49,6 @@ func (w *web) run() {
 
 	if err != nil {
 		log.Fatalf("error in fasthttp server: %s", err)
-	}
-}
-
-func (w *web) addACAO(h fasthttp.RequestHandler) fasthttp.RequestHandler {
-	return func(ctx *fasthttp.RequestCtx) {
-		ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
-		h(ctx)
 	}
 }
 
@@ -79,7 +81,7 @@ func (w *web) handleAdminRoot(ctx *fasthttp.RequestCtx) {
 		path = "/index.html"
 	}
 	log.Print("{admin}" + path)
-	bytes, err := w.adminFiles.Bytes(path)
+	bytes, err := adminFiles.ReadFile(path)
 	if err != nil {
 		ctx.NotFound()
 	} else {

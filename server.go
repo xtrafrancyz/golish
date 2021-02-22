@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/GeertJohan/go.rice"
 	"github.com/vharitonsky/iniflags"
 	"github.com/xtrafrancyz/golish/backend"
 )
@@ -66,8 +65,7 @@ func main() {
 	}
 
 	web := &web{
-		backend:    storage,
-		adminFiles: rice.MustFindBox("admin"),
+		backend: storage,
 	}
 	web.run()
 }
