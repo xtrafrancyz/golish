@@ -61,8 +61,6 @@ func (w *web) handleRoot(ctx *fasthttp.RequestCtx) {
 }
 
 func (w *web) handleSlug(ctx *fasthttp.RequestCtx) {
-	log.Print(string(ctx.URI().Path()))
-
 	// Make a copy of a slug. fasthttp/router's UserValues become invalid after the request is completed.
 	slug := copyString(ctx.UserValue("slug").(string))
 
@@ -80,7 +78,6 @@ func (w *web) handleAdminRoot(ctx *fasthttp.RequestCtx) {
 	if path == "//" {
 		path = "/index.html"
 	}
-	log.Print("{admin}" + path)
 	bytes, err := adminFiles.ReadFile(path)
 	if err != nil {
 		ctx.NotFound()
@@ -100,7 +97,6 @@ func (w *web) handleAdminRoot(ctx *fasthttp.RequestCtx) {
 }
 
 func (w *web) handleList(ctx *fasthttp.RequestCtx) {
-	log.Print("{admin}/list")
 	links := w.backend.GetAllLinks()
 	marshaled, _ := json.Marshal(links)
 	ctx.Response.Header.Set("Content-Type", "application/json")
