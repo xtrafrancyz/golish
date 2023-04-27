@@ -3,8 +3,6 @@ package main
 import (
 	"flag"
 	"log"
-	"math/rand"
-	"time"
 
 	"github.com/vharitonsky/iniflags"
 	"github.com/xtrafrancyz/golish/backend"
@@ -32,8 +30,6 @@ var Config struct {
 }
 
 func main() {
-	rand.Seed(time.Now().UTC().UnixNano())
-
 	flag.StringVar(&Config.host, "host", "0.0.0.0", "Server host")
 	flag.IntVar(&Config.port, "port", 34532, "Server port")
 	flag.IntVar(&Config.slugLength, "slug-length", 5, "Length of generated url")

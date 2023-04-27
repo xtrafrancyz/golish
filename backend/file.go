@@ -3,7 +3,6 @@ package backend
 import (
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"log"
 	"os"
 	pathpkg "path"
@@ -149,14 +148,14 @@ func (s *File) save() error {
 	if err != nil {
 		return err
 	}
-	if err = ioutil.WriteFile(s.file, bytes, 0644); err != nil {
+	if err = os.WriteFile(s.file, bytes, 0644); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (s *File) load() error {
-	bytes, err := ioutil.ReadFile(s.file)
+	bytes, err := os.ReadFile(s.file)
 	if err != nil {
 		return err
 	}
